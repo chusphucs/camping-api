@@ -38,11 +38,15 @@ async function bootstrap(): Promise<ExpressHandler> {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
 
+  const corsOrigin = config.get<string>(
+    'FRONTEND_ORIGIN',
+    'http://localhost:5173',
+  );
   app.enableCors({
-    origin: config
-      .get<string>('FRONTEND_ORIGIN', 'http://localhost:5173')
-      .split(',')
-      .map((o) => o.trim()),
+    // FRONTEND_ORIGIN="*" allows any origin (safe here since credentials are
+    // disabled); otherwise treat it as a comma-separated allowlist.
+    origin:
+      corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim()),
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: false,
