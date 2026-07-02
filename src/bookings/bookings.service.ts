@@ -21,6 +21,7 @@ import {
   reservedIntervals,
 } from '../availability/reservation.util';
 import { SupabaseService } from '../supabase/supabase.service';
+import { MailService } from '../mail/mail.service';
 import { BookingContactDto, CreateBookingDto } from './dto/create-booking.dto';
 import { BookingQueryDto } from './dto/booking-query.dto';
 import { LookupBookingDto } from './dto/lookup-booking.dto';
@@ -40,7 +41,10 @@ const BUSINESS_TZ_OFFSET = '+07:00';
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly mail: MailService,
+  ) {}
 
   /**
    * Public: create a guest booking with per-item rental windows.
@@ -142,7 +146,12 @@ export class BookingsService {
       throwDbError(iErr, 'Failed to create booking');
     }
 
-    return this.getDetail(booking.id);
+    const detail = await this.getDetail(booking.id);
+    // Best-effort admin notification. sendAdminNewBookingNotification swallows
+    // its own errors, so awaiting it never fails the (already committed) order;
+    // we await only so the send finishes before the serverless function ends.
+    await this.mail.sendAdminNewBookingNotification(detail);
+    return detail;
   }
 
   /**
@@ -322,7 +331,17 @@ export class BookingsService {
       .update({ status: next })
       .eq('id', id);
     if (error) throwDbError(error);
-    return this.getDetail(id);
+
+    const detail = await this.getDetail(id);
+    // Email the customer only when the admin first confirms the booking.
+    // Best-effort: sendCustomerConfirmation swallows its own errors.
+    if (
+      next === BookingStatus.CONFIRMED &&
+      current.status !== BookingStatus.CONFIRMED
+    ) {
+      await this.mail.sendCustomerConfirmation(detail);
+    }
+    return detail;
   }
 
   // ----- helpers -----

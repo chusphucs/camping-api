@@ -13,4 +13,9 @@ export const envValidationSchema = Joi.object({
   FRONTEND_ORIGIN: Joi.string().default('http://localhost:5173'),
   SUPABASE_URL: Joi.string().uri().required(),
   SUPABASE_SERVICE_ROLE_KEY: Joi.string().required(),
+  // Email notifications (Resend) are OPTIONAL — the app still boots and takes
+  // orders without them; MailService no-ops when the key/recipient are absent.
+  RESEND_API_KEY: Joi.string().allow('').optional(),
+  ADMIN_EMAIL: Joi.string().email().allow('').optional(),
+  MAIL_FROM: Joi.string().default('Camping Rental <onboarding@resend.dev>'),
 });
